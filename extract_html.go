@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -29,4 +30,9 @@ func getFirstParagraphFromHTML(html string) string {
 	}
 
 	return result
+}
+
+func getURLsFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
+
+	return nil, nil
 }
