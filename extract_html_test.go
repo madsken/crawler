@@ -53,5 +53,4 @@ func TestParageaphExtraction(t *testing.T) {
 	res = getFirstParagraphFromHTML(inputBody)
 	require.NotNil(t, res)
 	assert.Equal(t, "First paragraph outside main.", res)
-
 }
