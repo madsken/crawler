@@ -44,10 +44,10 @@ func getHTML(rawURL string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("error status code: %v\n", resp.StatusCode)
+		return "", fmt.Errorf("error status code: %v", resp.StatusCode)
 	}
 	if !strings.Contains(resp.Header.Get("content-type"), "text/html") {
-		return "", fmt.Errorf("response is not text/html\n")
+		return "", fmt.Errorf("response is not text/html")
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -99,5 +99,4 @@ func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
 	for _, nextURL := range nextURLs {
 		crawlPage(rawBaseURL, nextURL, pages)
 	}
-
 }
