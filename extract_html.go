@@ -8,6 +8,24 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+type PageData struct {
+	URL            string
+	Heading        string
+	FirstParagraph string
+	OutgoingLinks  []string
+	ImageURLs      []string
+}
+
+func NewPageData(u, h, p string) PageData {
+	return PageData{
+		URL:            u,
+		Heading:        h,
+		FirstParagraph: p,
+		ImageURLs:      nil,
+		OutgoingLinks:  nil,
+	}
+}
+
 func getHeadingFromHTML(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -96,4 +114,27 @@ func getImagesFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
 	})
 
 	return result, nil
+}
+
+func extractPageData(html, pageURL string) PageData {
+	pageData := NewPageData(pageURL, getHeadingFromHTML(html), getFirstParagraphFromHTML(html))
+
+	baseURL, err := url.Parse(pageURL)
+	if err != nil {
+		return pageData
+	}
+
+	links, err := getURLsFromHTML(html, baseURL)
+	if err != nil {
+		return pageData
+	}
+
+	imgs, err := getImagesFromHTML(html, baseURL)
+	if err != nil {
+		return pageData
+	}
+	pageData.OutgoingLinks = links
+	pageData.ImageURLs = imgs
+
+	return pageData
 }
