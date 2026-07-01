@@ -36,12 +36,6 @@ func (cfg *config) addPageData(normURL string, pagedata PageData) {
 	cfg.pages[normURL] = pagedata
 }
 
-func (cfg *config) isPagesLengthExceeded() bool {
-	cfg.mu.Lock()
-	defer cfg.mu.Unlock()
-	return len(cfg.pages) >= cfg.maxPages
-}
-
 func NewConfig(rawBaseURL string, maxConcurrency int, pageLimit int) (*config, error) {
 	baseURLParsed, err := url.Parse(rawBaseURL)
 	if err != nil {
