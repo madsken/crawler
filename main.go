@@ -8,7 +8,16 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 )
+
+type config struct {
+	pages              map[string]int
+	baseURL            *url.URL
+	mu                 *sync.Mutex
+	wg                 *sync.WaitGroup
+	concurrencyControl chan struct{}
+}
 
 func main() {
 	args := os.Args[1:]
@@ -21,10 +30,21 @@ func main() {
 		log.Fatal("too many arguments provided")
 	}
 	baseURL := args[0]
-	pages := make(map[string]int)
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		log.Fatal("Invalid url provided")
+	}
 
-	crawlPage(baseURL, baseURL, pages)
-	fmt.Printf("Pages scraped: %v\n", len(pages))
+	conf := config{
+		baseURL:            u,
+		pages:              make(map[string]int),
+		mu:                 &sync.Mutex{},
+		wg:                 &sync.WaitGroup{},
+		concurrencyControl: make(chan struct{}),
+	}
+	conf.crawlPage(baseURL)
+	conf.wg.Wait()
+	fmt.Printf("Pages scraped: %v\n", len(conf.pages))
 }
 
 func getHTML(rawURL string) (string, error) {
@@ -58,13 +78,13 @@ func getHTML(rawURL string) (string, error) {
 	return string(body), nil
 }
 
-func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
+func (cfg *config) crawlPage(rawCurrentURL string) {
 	currentURL, err := url.Parse(rawCurrentURL)
 	if err != nil {
 		return
 	}
 
-	baseURL, err := url.Parse(rawBaseURL)
+	baseURL, err := url.Parse(cfg.baseURL.String())
 	if err != nil {
 		return
 	}
@@ -79,11 +99,11 @@ func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
 	}
 
 	// increment and return if page has been crawled, start at 1 if it has not
-	if _, v := pages[normCurrURL]; v {
-		pages[normCurrURL]++
+	if _, v := cfg.pages[normCurrURL]; v {
+		cfg.pages[normCurrURL]++
 		return
 	}
-	pages[normCurrURL] = 1
+	cfg.pages[normCurrURL] = 1
 
 	fmt.Printf("Crawling page: %v\n", rawCurrentURL)
 	html, err := getHTML(rawCurrentURL)
@@ -97,7 +117,7 @@ func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
 	}
 
 	for _, nextURL := range nextURLs {
-		crawlPage(rawBaseURL, nextURL, pages)
+		cfg.crawlPage(nextURL)
 	}
 
 }
