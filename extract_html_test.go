@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,4 +54,118 @@ func TestParageaphExtraction(t *testing.T) {
 	res = getFirstParagraphFromHTML(inputBody)
 	require.NotNil(t, res)
 	assert.Equal(t, "First paragraph outside main.", res)
+}
+
+func TestGetURLsFromHTML(t *testing.T) {
+	//TEST: Abs url
+	inputURL := "https://crawler-test.com"
+	inputBody := `<html><body><a href="https://crawler-test.com"><span>Boot.dev</span></a></body></html>`
+	baseURL, err := url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err := getURLsFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com"}, urls)
+
+	//TEST: rel url
+	inputURL = "https://crawler-test.com"
+	inputBody = `<html><body><a href="/path/one"><span>Boot.dev</span></a></body></html>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getURLsFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com/path/one"}, urls)
+
+	//TEST: rel and abs url
+	inputURL = "https://crawler-test.com"
+	inputBody = `
+<html>
+	<body>
+		<a href="/path/one">
+			<span>Boot.dev</span>
+		</a>
+		<a href="https://other.com/path/one">
+			<span>Boot.dev</span>
+		</a>
+	</body>
+</html>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getURLsFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com/path/one", "https://other.com/path/one"}, urls)
+
+	//TEST: no href
+	inputURL = "https://crawler-test.com"
+	inputBody = `<html>
+	<body>
+		<a>
+			<span>Boot.dev</span>
+		</a>
+	</body>
+</html>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getURLsFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Nil(t, urls)
+
+	//TEST: bad html
+	inputURL = "https://crawler-test.com"
+	inputBody = `<html body>
+	<a href="path/one">
+		<span>Boot.dev</span>
+	</a>
+</html body>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getURLsFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com/path/one"}, urls)
+
+	//TEST: invalid href url
+	inputURL = "https://crawler-test.com"
+	inputBody = `<html>
+	<body>
+		<a href=":\\invalidURL">
+			<span>Boot.dev</span>
+		</a>
+	</body>
+</html>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getURLsFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Nil(t, urls)
+}
+
+func TestGetIMGsFromHTML(t *testing.T) {
+	//TEST: abs path
+	inputURL := "https://crawler-test.com"
+	inputBody := `<html><body><img src="https://crawler-test.com/logo.png" alt="Logo"></body></html>`
+	baseURL, err := url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err := getImagesFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com/logo.png"}, urls)
+
+	//TEST: rel path
+	inputURL = "https://crawler-test.com"
+	inputBody = `<html><body><img src="/logo.png" alt="Logo"></body></html>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getImagesFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com/logo.png"}, urls)
+
+	//TEST: multiple imgs
+	inputURL = "https://crawler-test.com"
+	inputBody = `<html><body>
+		<img src="/logo.png" alt="Logo">
+		<img src="https://cdn.boot.dev/banner.jpg">
+	</body></html>`
+	baseURL, err = url.Parse(inputURL)
+	require.NoError(t, err)
+	urls, err = getImagesFromHTML(inputBody, baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://crawler-test.com/logo.png", "https://cdn.boot.dev/banner.jpg"}, urls)
 }

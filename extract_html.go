@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -33,6 +34,66 @@ func getFirstParagraphFromHTML(html string) string {
 }
 
 func getURLsFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	var result []string
+
+	doc.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
+		href, ok := s.Attr("href")
+		if !ok {
+			return
+		}
+		href = strings.TrimSpace(href)
+		if href == "" {
+			return
+		}
+
+		//Parse href as url
+		u, err := url.Parse(href)
+		if err != nil {
+			fmt.Printf("Could not parse href %q: %v\n", href, err)
+			return
+		}
+
+		//ResolveReference: creates a new url, based on baseurl and reference url.
+		//if reference url is abs url, just use abs url.
+		//if ref url is rel url, construct new url based on baseurl and rel url
+		resolved := baseURL.ResolveReference(u)
+		result = append(result, resolved.String())
+	})
+
+	return result, nil
+}
+
+func getImagesFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
+	if err != nil {
+		return nil, err
+	}
+
+	var result []string
+
+	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
+		src, ok := s.Attr("src")
+		if !ok {
+			return
+		}
+		src = strings.TrimSpace(src)
+		if src == "" {
+			return
+		}
+
+		u, err := url.Parse(src)
+		if err != nil {
+			fmt.Printf("Could not parse href %q: %v\n", src, err)
+		}
+
+		resolved := baseURL.ResolveReference(u)
+		result = append(result, resolved.String())
+	})
+
+	return result, nil
 }
