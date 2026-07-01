@@ -7,44 +7,40 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
-	"sync"
 )
-
-type config struct {
-	pages              map[string]int
-	baseURL            *url.URL
-	mu                 *sync.Mutex
-	wg                 *sync.WaitGroup
-	concurrencyControl chan struct{}
-}
 
 func main() {
 	args := os.Args[1:]
 
-	if len(args) < 1 {
-		log.Fatal("no website provided")
+	if len(args) != 3 {
+		log.Fatal("usage: crawler <base-url> <max-concurrency> <max-pages>")
 	}
 
-	if len(args) > 1 {
-		log.Fatal("too many arguments provided")
-	}
 	baseURL := args[0]
-	u, err := url.Parse(baseURL)
+	maxConcurrency, err := strconv.Atoi(args[1])
 	if err != nil {
-		log.Fatal("Invalid url provided")
+		log.Fatal("Max Concurrency mus be a number")
+	}
+	maxPages, err := strconv.Atoi(args[2])
+	if err != nil {
+		log.Fatal("Max Pages mus be a number")
 	}
 
-	conf := config{
-		baseURL:            u,
-		pages:              make(map[string]int),
-		mu:                 &sync.Mutex{},
-		wg:                 &sync.WaitGroup{},
-		concurrencyControl: make(chan struct{}),
+	cfg, err := NewConfig(baseURL, maxConcurrency, maxPages)
+	if err != nil {
+		log.Fatal(err)
 	}
-	conf.crawlPage(baseURL)
-	conf.wg.Wait()
-	fmt.Printf("Pages scraped: %v\n", len(conf.pages))
+
+	cfg.wg.Add(1)
+	go cfg.crawlPage(baseURL)
+	cfg.wg.Wait()
+
+	fmt.Printf("Pages scraped: %v\n", len(cfg.pages))
+	for page := range cfg.pages {
+		fmt.Println(page)
+	}
 }
 
 func getHTML(rawURL string) (string, error) {
@@ -62,7 +58,6 @@ func getHTML(rawURL string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
 		return "", fmt.Errorf("error status code: %v", resp.StatusCode)
 	}
@@ -79,16 +74,21 @@ func getHTML(rawURL string) (string, error) {
 }
 
 func (cfg *config) crawlPage(rawCurrentURL string) {
+	cfg.concurrencyControl <- struct{}{}
+	defer func() {
+		<-cfg.concurrencyControl
+		cfg.wg.Done()
+	}()
+
+	// Check and skip other websites from base url
 	currentURL, err := url.Parse(rawCurrentURL)
 	if err != nil {
 		return
 	}
-
 	baseURL, err := url.Parse(cfg.baseURL.String())
 	if err != nil {
 		return
 	}
-
 	if currentURL.Hostname() != baseURL.Hostname() {
 		return // Skips other websites
 	}
@@ -98,25 +98,25 @@ func (cfg *config) crawlPage(rawCurrentURL string) {
 		return
 	}
 
-	// increment and return if page has been crawled, start at 1 if it has not
-	if _, v := cfg.pages[normCurrURL]; v {
-		cfg.pages[normCurrURL]++
+	// checks if page has been visited before (in which case we skip)
+	if !cfg.pageVisit(normCurrURL) {
 		return
 	}
-	cfg.pages[normCurrURL] = 1
 
 	fmt.Printf("Crawling page: %v\n", rawCurrentURL)
 	html, err := getHTML(rawCurrentURL)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	nextURLs, err := getURLsFromHTML(html, baseURL)
-	if err != nil {
-		return
-	}
+	// Add page data to cfg
+	pagedata := extractPageData(html, rawCurrentURL)
+	cfg.addPageData(normCurrURL, pagedata)
 
-	for _, nextURL := range nextURLs {
-		cfg.crawlPage(nextURL)
+	// recursively crawl found links
+	for _, nextURL := range pagedata.OutgoingLinks {
+		cfg.wg.Add(1)
+		go cfg.crawlPage(nextURL)
 	}
 }
