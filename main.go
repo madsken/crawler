@@ -37,9 +37,9 @@ func main() {
 	go cfg.crawlPage(baseURL)
 	cfg.wg.Wait()
 
-	fmt.Printf("Pages scraped: %v\n", len(cfg.pages))
-	for page := range cfg.pages {
-		fmt.Println(page)
+	err = writeJSONReport(cfg.pages, "report.json")
+	if err != nil {
+		log.Fatalf("Error writing json report: %v", err)
 	}
 }
 

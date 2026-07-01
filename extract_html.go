@@ -9,11 +9,11 @@ import (
 )
 
 type PageData struct {
-	URL            string
-	Heading        string
-	FirstParagraph string
-	OutgoingLinks  []string
-	ImageURLs      []string
+	URL            string   `json:"url"`
+	Heading        string   `json:"heading"`
+	FirstParagraph string   `json:"first_paragraph"`
+	OutgoingLinks  []string `json:"outgoing_links"`
+	ImageURLs      []string `json:"image_urls"`
 }
 
 func NewPageData(u, h, p string) PageData {
@@ -69,16 +69,16 @@ func getURLsFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
 			return
 		}
 
-		//Parse href as url
+		// Parse href as url
 		u, err := url.Parse(href)
 		if err != nil {
 			fmt.Printf("Could not parse href %q: %v\n", href, err)
 			return
 		}
 
-		//ResolveReference: creates a new url, based on baseurl and reference url.
-		//if reference url is abs url, just use abs url.
-		//if ref url is rel url, construct new url based on baseurl and rel url
+		// ResolveReference: creates a new url, based on baseurl and reference url.
+		// if reference url is abs url, just use abs url.
+		// if ref url is rel url, construct new url based on baseurl and rel url
 		resolved := baseURL.ResolveReference(u)
 		result = append(result, resolved.String())
 	})
